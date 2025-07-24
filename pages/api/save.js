@@ -1,5 +1,4 @@
 import { google } from 'googleapis';
-import path from 'path';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).send('Only POST allowed');
@@ -8,33 +7,42 @@ export default async function handler(req, res) {
   if (!row) return res.status(400).json({ error: 'Missing data row' });
 
   try {
-    const keyPath = path.join(process.cwd(), 'service-account.json');
-    const auth = new google.auth.GoogleAuth({
-      keyFile: keyPath,
-      scopes: ['https://www.googleapis.com/auth/spreadsheets'],
-    });
+    // ✅ สร้าง auth จาก ENV
+    const auth = new google.auth.JWT(
+      process.env.GOOGLE_CLIENT_EMAIL,
+      null,
+      process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+      ['https://www.googleapis.com/auth/spreadsheets']
+    );
 
     const sheets = google.sheets({ version: 'v4', auth });
     const sheetId = process.env.GOOGLE_SHEET_ID;
 
-    const formatValue = (value) => {
-      if (value === null || value === undefined) return '';
-      if (typeof value === 'number') return value;
-      if (typeof value === 'string') return value;
-      if (Array.isArray(value)) return value.join(' | ');
-      if (typeof value === 'object') return Object.entries(value).map(([k, v]) => `${k}: ${v}`).join(', ');
-      return String(value);
-    };
-
+    // 🗓️ วันที่รูปแบบ DD/MM/YYYY
     const today = new Date();
     const recordDate = `${String(today.getDate()).padStart(2, '0')}/${String(today.getMonth() + 1).padStart(2, '0')}/${today.getFullYear()}`;
 
+    // 🔢 ID = จำนวน row ปัจจุบัน + 1
     const countRes = await sheets.spreadsheets.values.get({
       spreadsheetId: sheetId,
       range: 'Sheet1!A2:A',
     });
     const currentRowCount = (countRes.data.values || []).length;
     const nextId = currentRowCount + 1;
+
+    // 🔁 ฟังก์ชัน format ข้อมูลก่อนส่งเข้า Sheets
+    const formatValue = (value) => {
+      if (value === null || value === undefined) return '';
+      if (typeof value === 'string') return value;
+      if (typeof value === 'number') return value;
+      if (Array.isArray(value)) return value.join('\n');
+      if (typeof value === 'object') {
+        return Object.entries(value)
+          .map(([key, val]) => `${key}: ${val}`)
+          .join(', ');
+      }
+      return String(value);
+    };
 
     const values = [
       nextId,
@@ -70,20 +78,27 @@ export default async function handler(req, res) {
       formatValue(row["expected_salary"])
     ];
 
+    // 📦 ดึงข้อมูลเดิมทั้งหมด (A2 ลงไป)
     const existing = await sheets.spreadsheets.values.get({
       spreadsheetId: sheetId,
       range: 'Sheet1!A2:Z',
     });
     const oldRows = existing.data.values || [];
+
+    // 🔁 เพิ่ม row ใหม่ไว้ด้านบน
     const newData = [values, ...oldRows];
 
+    // ✍️ อัปเดตแถวทั้งหมด
     const response = await sheets.spreadsheets.values.update({
       spreadsheetId: sheetId,
-      range: `Sheet1!A2`,
+      range: 'Sheet1!A2',
       valueInputOption: 'RAW',
-      requestBody: { values: newData },
+      requestBody: {
+        values: newData,
+      },
     });
 
+    console.log('✅ Data saved to Google Sheets');
     res.status(200).json({ success: true, result: response.data });
 
   } catch (error) {
@@ -91,7 +106,7 @@ export default async function handler(req, res) {
     res.status(500).json({
       success: false,
       error: error.message,
-      code: error.code || 'UNKNOWN_ERROR'
+      code: error.code || 'UNKNOWN_ERROR',
     });
   }
 }

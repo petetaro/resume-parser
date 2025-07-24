@@ -107,7 +107,7 @@ ${cleanedText}`;
       temperature: 0,
       max_tokens: 800,
       messages: [{ role: 'user', content: prompt }],
-      response_format: 'json' // 🧠 เปิด response_format เพื่อ JSON ที่ parse ได้
+      // response_format: 'json' // 🧠 เปิด response_format เพื่อ JSON ที่ parse ได้
     });
 
     let extracted;

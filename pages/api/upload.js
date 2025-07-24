@@ -41,7 +41,9 @@ export default async function handler(req, res) {
     if (file.mimetype === 'application/pdf') {
       const data = await pdfParse(buffer);
       text = data.text;
-    } else if (file.mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+    } else if (
+      file.mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    ) {
       const result = await mammoth.extractRawText({ buffer });
       text = result.value;
     } else {
@@ -91,8 +93,11 @@ export default async function handler(req, res) {
 Rules:
 - Work experience should be ordered by most recent first.
 - If fewer than 3 companies exist, use "-" for missing fields.
-- If more than 3 companies, put 4+ into "other_companies" with name, dates, and position (1 per line, \n separated).
-- Return only valid JSON, no explanation.
+- If more than 3 companies, put 4+ into "other_companies" with name, dates, and position (1 per line, \\n separated).
+- Return only valid JSON.
+- Do not explain anything. Do not wrap JSON in markdown or code block.
+- Do not use smart quotes. Avoid backslashes.
+- Respond only with machine-parsable JSON.
 
 Resume:
 ${cleanedText}`;
@@ -102,9 +107,21 @@ ${cleanedText}`;
       temperature: 0,
       max_tokens: 800,
       messages: [{ role: 'user', content: prompt }],
+      response_format: 'json' // 🧠 เปิด response_format เพื่อ JSON ที่ parse ได้
     });
 
-    const extracted = JSON.parse(completion.choices[0].message.content);
+    let extracted;
+    try {
+      extracted = JSON.parse(completion.choices[0].message.content);
+    } catch (err) {
+      console.error('❌ JSON parse error:', err.message);
+      console.error('🧠 AI raw response:\n', completion.choices[0].message.content);
+      return res.status(500).json({
+        error: 'AI returned invalid JSON. Check formatting.',
+        detail: err.message
+      });
+    }
+
     res.status(200).json({ extracted, model_used: model });
 
   } catch (error) {

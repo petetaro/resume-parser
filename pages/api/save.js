@@ -37,21 +37,40 @@ export default async function handler(req, res) {
     });
 
     const sheets = google.sheets({ version: 'v4', auth });
-    const sheetId = process.env.GOOGLE_SHEET_ID;
+    
+    // 🧪 ทดสอบใส่ Sheet ID ตรงๆ เพื่อแยกปัญหา
+    const sheetId = '1lDFfNn9y0smq3oyM67YC5PORw-13gW4U1ZSIkOPeVt8'; // ใส่ตรงๆ
+    // const sheetId = process.env.GOOGLE_SHEET_ID; // comment ไว้ก่อน
 
-    console.log('📊 Sheet ID:', sheetId);
+    console.log('📊 Sheet ID (hardcoded):', sheetId);
 
     // 🔍 ตรวจสอบว่า spreadsheet มีอยู่จริงและ get sheet names
     console.log('🔍 Getting spreadsheet metadata...');
-    const spreadsheetInfo = await sheets.spreadsheets.get({
-      spreadsheetId: sheetId,
-    });
     
-    console.log('📋 Available sheets:', spreadsheetInfo.data.sheets.map(s => s.properties.title));
-    
-    // ใช้ชื่อ sheet แรกที่มี (ไม่จำเป็นต้องเป็น Sheet1)
-    const firstSheetName = spreadsheetInfo.data.sheets[0].properties.title;
-    console.log('📊 Using sheet name:', firstSheetName);
+    try {
+      const spreadsheetInfo = await sheets.spreadsheets.get({
+        spreadsheetId: sheetId,
+      });
+      
+      console.log('✅ Spreadsheet access successful!');
+      console.log('📊 Spreadsheet title:', spreadsheetInfo.data.properties.title);
+      console.log('📋 Available sheets:', spreadsheetInfo.data.sheets.map(s => s.properties.title));
+      
+      // ใช้ชื่อ sheet แรกที่มี
+      const firstSheetName = spreadsheetInfo.data.sheets[0].properties.title;
+      console.log('📊 Using sheet name:', firstSheetName);
+      
+    } catch (metadataError) {
+      console.error('❌ Failed to get spreadsheet metadata:', metadataError.message);
+      console.error('❌ Error code:', metadataError.code);
+      console.error('❌ Error details:', {
+        status: metadataError.status,
+        message: metadataError.message,
+        response: metadataError.response?.data || 'No response data'
+      });
+      
+      throw new Error(`Cannot access spreadsheet: ${metadataError.message} (${metadataError.code})`);
+    }
 
     // 🗓️ วันที่รูปแบบ DD/MM/YYYY
     const today = new Date();

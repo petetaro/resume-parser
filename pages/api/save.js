@@ -41,6 +41,18 @@ export default async function handler(req, res) {
 
     console.log('📊 Sheet ID:', sheetId);
 
+    // 🔍 ตรวจสอบว่า spreadsheet มีอยู่จริงและ get sheet names
+    console.log('🔍 Getting spreadsheet metadata...');
+    const spreadsheetInfo = await sheets.spreadsheets.get({
+      spreadsheetId: sheetId,
+    });
+    
+    console.log('📋 Available sheets:', spreadsheetInfo.data.sheets.map(s => s.properties.title));
+    
+    // ใช้ชื่อ sheet แรกที่มี (ไม่จำเป็นต้องเป็น Sheet1)
+    const firstSheetName = spreadsheetInfo.data.sheets[0].properties.title;
+    console.log('📊 Using sheet name:', firstSheetName);
+
     // 🗓️ วันที่รูปแบบ DD/MM/YYYY
     const today = new Date();
     const recordDate = `${String(today.getDate()).padStart(2, '0')}/${String(today.getMonth() + 1).padStart(2, '0')}/${today.getFullYear()}`;
@@ -49,7 +61,7 @@ export default async function handler(req, res) {
     console.log('📋 Getting current row count...');
     const countRes = await sheets.spreadsheets.values.get({
       spreadsheetId: sheetId,
-      range: 'Sheet1!A2:A',
+      range: `${firstSheetName}!A2:A`, // ใช้ชื่อ sheet ที่ได้จริง
     });
     const currentRowCount = (countRes.data.values || []).length;
     const nextId = currentRowCount + 1;
@@ -107,7 +119,7 @@ export default async function handler(req, res) {
     console.log('📦 Getting existing data...');
     const existing = await sheets.spreadsheets.values.get({
       spreadsheetId: sheetId,
-      range: 'Sheet1!A2:Z',
+      range: `${firstSheetName}!A2:Z`, // ใช้ชื่อ sheet ที่ได้จริง
     });
     const oldRows = existing.data.values || [];
 
@@ -118,7 +130,7 @@ export default async function handler(req, res) {
     console.log('✍️ Updating spreadsheet...');
     const response = await sheets.spreadsheets.values.update({
       spreadsheetId: sheetId,
-      range: 'Sheet1!A2',
+      range: `${firstSheetName}!A2`, // ใช้ชื่อ sheet ที่ได้จริง
       valueInputOption: 'RAW',
       requestBody: {
         values: newData,

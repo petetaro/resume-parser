@@ -47,6 +47,8 @@ export default async function handler(req, res) {
     // 🔍 ตรวจสอบว่า spreadsheet มีอยู่จริงและ get sheet names
     console.log('🔍 Getting spreadsheet metadata...');
     
+    let firstSheetName = 'Sheet1'; // default value
+    
     try {
       const spreadsheetInfo = await sheets.spreadsheets.get({
         spreadsheetId: sheetId,
@@ -57,7 +59,7 @@ export default async function handler(req, res) {
       console.log('📋 Available sheets:', spreadsheetInfo.data.sheets.map(s => s.properties.title));
       
       // ใช้ชื่อ sheet แรกที่มี
-      const firstSheetName = spreadsheetInfo.data.sheets[0].properties.title;
+      firstSheetName = spreadsheetInfo.data.sheets[0].properties.title;
       console.log('📊 Using sheet name:', firstSheetName);
       
     } catch (metadataError) {

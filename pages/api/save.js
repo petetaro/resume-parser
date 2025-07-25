@@ -119,6 +119,15 @@ export default async function handler(req, res) {
 
   } catch (error) {
     console.error('❌ Error saving to Google Sheets:', error);
+
+    if (error.code === 401) {
+      console.error('🔐 Authentication failed. Check your credentials.');
+    } else if (error.code === 403) {
+      console.error('🚫 Permission denied. Check sheet sharing permissions.');
+    } else if (error.code === 404) {
+      console.error('📄 Sheet not found. Check your GOOGLE_SHEET_ID.');
+    }
+    
     res.status(500).json({
       success: false,
       error: error.message,

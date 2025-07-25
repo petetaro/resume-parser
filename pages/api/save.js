@@ -7,7 +7,7 @@ export default async function handler(req, res) {
   if (!row) return res.status(400).json({ error: 'Missing data row' });
 
   try {
-    // ✅ สร้าง auth จาก ENV
+    /* ✅ สร้าง auth จาก ENV
     const auth = new google.auth.JWT(
       process.env.GOOGLE_CLIENT_EMAIL,
       null,
@@ -17,6 +17,22 @@ export default async function handler(req, res) {
 
     const sheets = google.sheets({ version: 'v4', auth });
     const sheetId = process.env.GOOGLE_SHEET_ID;
+
+    */
+
+    // ใช้ Environment Variable แทนไฟล์ JSON
+    const serviceAccountKey = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_KEY);
+    
+    const auth = new google.auth.GoogleAuth({
+      credentials: serviceAccountKey, // ใช้ credentials แทน keyFile
+      scopes: ['https://www.googleapis.com/auth/spreadsheets']
+    });
+
+    const sheets = google.sheets({ version: 'v4', auth });
+    const sheetId = process.env.GOOGLE_SHEET_ID;
+
+    console.log('📊 Sheet ID:', sheetId);
+
 
     // 🗓️ วันที่รูปแบบ DD/MM/YYYY
     const today = new Date();

@@ -131,7 +131,7 @@ export default async function handler(req, res) {
 
     const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-    const prompt = `Extract information from this resume and return ONLY valid JSON with no additional text.
+const prompt = `Extract information from this resume and return ONLY valid JSON with no additional text.
 
 Return this exact JSON structure:
 {
@@ -162,15 +162,29 @@ Return this exact JSON structure:
   "expected_salary": ""
 }
 
-Rules for work experience extraction:
-- Only include companies where the person actually WORKED
-- Look for job titles, responsibilities, and employment dates
-- Ignore company names in headers, footers, or document templates
+CRITICAL RULES for work experience extraction:
+- ONLY extract companies where the person actually WORKED with clear employment history
+- Look for sections labeled "EXPERIENCE", "WORK EXPERIENCE", "EMPLOYMENT HISTORY", "CAREER" or similar
+- Each work entry MUST have: company name, job title/position, and job responsibilities
+- IGNORE company names that appear in:
+  * Headers or footers of the document
+  * Contact information sections
+  * Document templates or letterheads
+  * Reference sections
+  * Companies mentioned as clients or projects (unless clearly employed there)
+  * Recruitment agency information
+  * Resume service provider information
 - Work experience should be ordered by most recent first
-- If less than 3 companies, use "-" for missing fields
+- If less than 3 companies, use "" (empty string) for missing fields
 - If more than 3 companies, put extras in "other_companies" (one per line)
-- Focus on the WORK EXPERIENCE or EMPLOYMENT section of the resume
-- Verify that each company entry has corresponding job duties or responsibilities
+- Duration must show employment period (start date to end date)
+- Verify each company has corresponding job duties and responsibilities listed
+- If a company name appears without clear employment context, DO NOT include it
+
+Additional validation:
+- Check that job_details describe actual work responsibilities
+- Ensure duration shows a time period, not just contact info
+- Cross-reference company names with their context in the document
 
 Keep text short and simple. No line breaks in values (use spaces instead). Use regular quotes only. Return pure JSON only.
 
@@ -264,6 +278,94 @@ Resume: ${cleanedText.substring(0, 8000)}`; // จำกัดความยา
         }
       }
     }
+
+      const validateWorkExperience = (extracted, originalText) => {
+        // คำที่บ่งบอกว่าเป็นส่วน header/footer หรือข้อมูลที่ไม่ใช่ work experience
+        const excludeKeywords = [
+          'contact@', 'www.', '.com', '.co.th', '.net', '.org',
+          'phone:', 'tel:', 'email:', 'address:',
+          'reference:', 'upon request', 'available',
+          'recruiter', 'recruitment', 'agency', 'consultant',
+          'cv', 'resume', 'curriculum vitae'
+        ];
+
+        // ตรวจสอบแต่ละ company
+        ['company_1', 'company_2', 'company_3'].forEach(companyKey => {
+          const company = extracted[companyKey];
+          const positionKey = companyKey.replace('company', 'position');
+          const detailsKey = companyKey.replace('company', 'job_details');
+          const durationKey = companyKey.replace('company', 'duration');
+      
+          if (company) {
+            // ตรวจสอบว่าชื่อบริษัทมี keyword ที่น่าสงสัย
+            const companyLower = company.toLowerCase();
+            const hasExcludeKeyword = excludeKeywords.some(keyword => 
+              companyLower.includes(keyword.toLowerCase())
+            );
+          
+            // ตรวจสอบว่ามี job details และ position หรือไม่
+            const hasJobDetails = extracted[detailsKey] && extracted[detailsKey].trim().length > 10;
+            const hasPosition = extracted[positionKey] && extracted[positionKey].trim().length > 0;
+            const hasDuration = extracted[durationKey] && extracted[durationKey].trim().length > 0;
+          
+            // ถ้าพบ keyword ที่น่าสงสัย หรือไม่มี job details ที่สมเหตุสมผล
+            if (hasExcludeKeyword || !hasJobDetails || !hasPosition) {
+              console.log(`⚠️ Suspicious work entry removed: ${company}`);
+              console.log(`  - Has exclude keyword: ${hasExcludeKeyword}`);
+              console.log(`  - Has job details: ${hasJobDetails}`);
+              console.log(`  - Has position: ${hasPosition}`);
+            
+              // ลบข้อมูลนี้ออก
+              extracted[companyKey] = "";
+              extracted[positionKey] = "";
+              extracted[detailsKey] = "";
+              extracted[durationKey] = "";
+            }
+          }
+        });
+
+        // จัดเรียงข้อมูลใหม่ให้ company ที่มีข้อมูลอยู่ด้านบน
+        const companies = [];
+        ['company_1', 'company_2', 'company_3'].forEach(companyKey => {
+          if (extracted[companyKey]) {
+            const positionKey = companyKey.replace('company', 'position');
+            const detailsKey = companyKey.replace('company', 'job_details');
+            const durationKey = companyKey.replace('company', 'duration');
+        
+            companies.push({
+              company: extracted[companyKey],
+              position: extracted[positionKey],
+              details: extracted[detailsKey],
+              duration: extracted[durationKey]
+            });
+          }
+        });
+
+        // รีเซ็ตข้อมูล company ทั้งหมด
+        ['company_1', 'company_2', 'company_3'].forEach(companyKey => {
+          const positionKey = companyKey.replace('company', 'position');
+          const detailsKey = companyKey.replace('company', 'job_details');
+          const durationKey = companyKey.replace('company', 'duration');
+    
+          extracted[companyKey] = "";
+          extracted[positionKey] = "";
+          extracted[detailsKey] = "";
+          extracted[durationKey] = "";
+        });
+
+        // เติมข้อมูล company ที่ถูกต้องกลับเข้าไป
+        companies.forEach((comp, index) => {
+          if (index < 3) {
+            const num = index + 1;
+            extracted[`company_${num}`] = comp.company;
+            extracted[`position_${num}`] = comp.position;
+            extracted[`job_details_${num}`] = comp.details;
+            extracted[`duration_${num}`] = comp.duration;
+          }
+        });
+
+          return extracted;
+        };
 
     // ตรวจสอบว่า extracted มี field ที่จำเป็น
     const requiredFields = ['full_name', 'phone_number', 'email'];

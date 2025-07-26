@@ -87,8 +87,9 @@ export default async function handler(req, res) {
     console.log('🔢 Next ID will be:', nextId);
 
     // 🔁 ฟังก์ชัน format ข้อมูลก่อนส่งเข้า Sheets
-    const formatValue = (value) => {
+    const formatValue = (value, forceNumber = false) => {
       if (value === null || value === undefined) return '';
+      if (forceNumber && !isNaN(value) && value !== '') return Number(value);
       if (typeof value === 'string') return value;
       if (typeof value === 'number') return value;
       if (Array.isArray(value)) return value.join('\n');
@@ -101,7 +102,7 @@ export default async function handler(req, res) {
     };
 
     const values = [
-      nextId,
+      nextId, // เป็น number อยู่แล้ว
       recordDate,
       formatValue(row["full_name"]),
       formatValue(row["phone_number"]),
@@ -134,7 +135,7 @@ export default async function handler(req, res) {
       formatValue(row["expected_salary"])
     ];
 
-    // 📦 ดึงข้อมูลเดิมทั้งหมด (A2 ลงไป)
+ // 📦 ดึงข้อมูลเดิมทั้งหมด (A2 ลงไป)
     console.log('📦 Getting existing data...');
     const existing = await sheets.spreadsheets.values.get({
       spreadsheetId: sheetId,
@@ -142,15 +143,29 @@ export default async function handler(req, res) {
     });
     const oldRows = existing.data.values || [];
 
+    // 🔄 แปลงข้อมูลเก่าให้ ID เป็น number
+    const processedOldRows = oldRows.map(row => {
+      if (row && row[0]) {
+        // แปลงคอลัมน์แรก (ID) เป็น number
+        const processedRow = [...row];
+        const idValue = processedRow[0];
+        if (!isNaN(idValue) && idValue !== '') {
+          processedRow[0] = Number(idValue);
+        }
+        return processedRow;
+      }
+      return row;
+    });
+
     // 🔁 เพิ่ม row ใหม่ไว้ด้านบน
-    const newData = [values, ...oldRows];
+    const newData = [values, ...processedOldRows];
 
     // ✍️ อัปเดตแถวทั้งหมด
     console.log('✍️ Updating spreadsheet...');
     const response = await sheets.spreadsheets.values.update({
       spreadsheetId: sheetId,
       range: `${firstSheetName}!A2`, // ใช้ชื่อ sheet ที่ได้จริง
-      valueInputOption: 'RAW',
+      valueInputOption: 'USER_ENTERED', // ✅ เปลี่ยนจาก RAW เป็น USER_ENTERED
       requestBody: {
         values: newData,
       },

@@ -162,14 +162,17 @@ Return this exact JSON structure:
   "expected_salary": ""
 }
 
-Rules:
-- Work experience: most recent first
+Rules for work experience extraction:
+- Only include companies where the person actually WORKED
+- Look for job titles, responsibilities, and employment dates
+- Ignore company names in headers, footers, or document templates
+- Work experience should be ordered by most recent first
 - If less than 3 companies, use "-" for missing fields
 - If more than 3 companies, put extras in "other_companies" (one per line)
-- Keep text short and simple
-- No line breaks in values (use spaces instead)
-- Use regular quotes only
-- Return pure JSON only
+- Focus on the WORK EXPERIENCE or EMPLOYMENT section of the resume
+- Verify that each company entry has corresponding job duties or responsibilities
+
+Keep text short and simple. No line breaks in values (use spaces instead). Use regular quotes only. Return pure JSON only.
 
 Resume: ${cleanedText.substring(0, 8000)}`; // จำกัดความยาวของ resume text
 

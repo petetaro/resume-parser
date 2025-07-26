@@ -38,9 +38,7 @@ export default async function handler(req, res) {
 
     const sheets = google.sheets({ version: 'v4', auth });
     
-    // 🧪 ทดสอบใส่ Sheet ID ตรงๆ เพื่อแยกปัญหา
-    const sheetId = '1lDFfNn9y0smq3oyM67YC5PORw-13gW4U1ZSIkOPeVt8'; // ใส่ตรงๆ
-    // const sheetId = process.env.GOOGLE_SHEET_ID; // comment ไว้ก่อน
+    const sheetId = process.env.GOOGLE_SHEET_ID;
 
     console.log('📊 Sheet ID (hardcoded):', sheetId);
 
